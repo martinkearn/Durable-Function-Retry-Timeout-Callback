@@ -5,17 +5,17 @@ using System;
 
 namespace FunctionApp.Entities
 {
-    public class RetryCounterEntity
+    public class AttemptCounterEntity
     {
-        [FunctionName(nameof(RetryCounterEntity))]
+        [FunctionName(nameof(AttemptCounterEntity))]
         public static void Counter([EntityTrigger] IDurableEntityContext ctx)
         {
-            switch (Enum.Parse(typeof(Enums.RetryCounterEntityOperation), ctx.OperationName, true))
+            switch (Enum.Parse(typeof(Enums.AttemptCounterEntityOperation), ctx.OperationName, true))
             {
-                case Enums.RetryCounterEntityOperation.Increment:
+                case Enums.AttemptCounterEntityOperation.Increment:
                     ctx.SetState(ctx.GetState<int>() + 1);
                     break;
-                case Enums.RetryCounterEntityOperation.Get:
+                case Enums.AttemptCounterEntityOperation.Get:
                     ctx.Return(ctx.GetState<int>());
                     break;
             }

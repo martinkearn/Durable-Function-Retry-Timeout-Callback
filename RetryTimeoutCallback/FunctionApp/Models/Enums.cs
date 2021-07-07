@@ -2,7 +2,7 @@
 {
     public class Enums
     {
-        public enum RetryCounterEntityOperation
+        public enum AttemptCounterEntityOperation
         {
             Increment,
             Get

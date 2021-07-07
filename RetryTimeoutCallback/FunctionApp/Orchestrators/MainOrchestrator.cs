@@ -1,4 +1,6 @@
+using System.Net;
 using System.Threading.Tasks;
+using FunctionApp.Activities;
 using FunctionApp.Entities;
 using FunctionApp.Models;
 using Microsoft.Azure.WebJobs;
@@ -11,28 +13,29 @@ namespace FunctionApp.Orchestrators
         [FunctionName(nameof(MainOrchestrator))]
         public static async Task<string> RunOrchestrator([OrchestrationTrigger] IDurableOrchestrationContext context)
         {
-            var retryLimit = 3;
 
             // Setup entity ID key'd from the orchestration instance id. One counter per orchestration instance.
-            var retryCounterEntityId = new EntityId(nameof(RetryCounterEntity), context.InstanceId);
+            var attemptCounterEntityId = new EntityId(nameof(AttemptCounterEntity), context.InstanceId);
 
-            // Increment counter until it is equal to the retryLimit
-            var retryAttempts = 0;
+            // Call Api until we get sucess or have reached the retry limit
+            var attemptLimit = 5;
+            var attempts = 0;
+            HttpStatusCode status;
+            bool success;
             do
             {
+                // Increment attempt counter
+                context.SignalEntity(attemptCounterEntityId, Enums.AttemptCounterEntityOperation.Increment.ToString());
+
                 // Do work here
+                status = await context.CallActivityAsync<HttpStatusCode>(nameof(CallApiActivity), null);
+                success = (status == HttpStatusCode.OK);
 
-                // Incremenet counter
-                context.SignalEntity(retryCounterEntityId, Enums.RetryCounterEntityOperation.Increment.ToString());
+                // Get current counter value
+                attempts = await context.CallEntityAsync<int>(attemptCounterEntityId, Enums.AttemptCounterEntityOperation.Get.ToString());
+            } while ( (attempts < attemptLimit) && (!success) );
 
-                // get current counter value
-                retryAttempts = await context.CallEntityAsync<int>(retryCounterEntityId, Enums.RetryCounterEntityOperation.Get.ToString());
-            } while (retryAttempts < retryLimit);
-
-            // Get final counter value.
-            var finalRetryCounterValue = await context.CallEntityAsync<int>(retryCounterEntityId, Enums.RetryCounterEntityOperation.Get.ToString());
-
-            return $"Have attempted {finalRetryCounterValue} retrys";
+            return $"Finished with status of {status} after {attempts} attempts";
         }
     }
 }

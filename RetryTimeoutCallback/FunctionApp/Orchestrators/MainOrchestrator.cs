@@ -30,9 +30,12 @@ namespace FunctionApp.Orchestrators
 
                 // Get current counter value
                 attempts = await context.CallEntityAsync<int>(attemptCounterEntityId, Enums.AttemptCounterEntityOperation.Get.ToString());
-            } while (
-                (attempts < attemptLimit) && 
-                (status != HttpStatusCode.OK) 
+            } 
+            while
+            (
+                (attempts < attemptLimit)
+                &&
+                (status != HttpStatusCode.OK)
             );
 
             return $"Finished with status of {status} after {attempts} attempts";

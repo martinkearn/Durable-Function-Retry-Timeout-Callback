@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using FunctionApp.Entities;
+using FunctionApp.Models;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
 
@@ -16,16 +17,22 @@ namespace FunctionApp.Orchestrators
             var retryCounterEntityId = new EntityId(nameof(RetryCounterEntity), context.InstanceId);
 
             // Increment counter until it is equal to the retryLimit
+            var retryAttempts = 0;
             do
             {
-                // do work here
-                context.SignalEntity(retryCounterEntityId, "increment");
-            } while (await context.CallEntityAsync<int>(retryCounterEntityId, "get") < retryLimit);
+                // Do work here
+
+                // Incremenet counter
+                context.SignalEntity(retryCounterEntityId, Enums.RetryCounterEntityOperation.Increment.ToString());
+
+                // get current counter value
+                retryAttempts = await context.CallEntityAsync<int>(retryCounterEntityId, Enums.RetryCounterEntityOperation.Get.ToString());
+            } while (retryAttempts < retryLimit);
 
             // Get final counter value.
-            var finalRetryCounterValue = await context.CallEntityAsync<int>(retryCounterEntityId, "get");
+            var finalRetryCounterValue = await context.CallEntityAsync<int>(retryCounterEntityId, Enums.RetryCounterEntityOperation.Get.ToString());
 
-            return $"Final count {finalRetryCounterValue}";
+            return $"Have attempted {finalRetryCounterValue} retrys";
         }
     }
 }

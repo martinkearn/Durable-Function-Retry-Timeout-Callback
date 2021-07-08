@@ -19,18 +19,16 @@ namespace WebApi.Controllers
         [HttpPost]
         public ActionResult Post(ResponseInstructions instructions)
         {
-            if (instructions.CallbackAfterSeconds > 0)
+
+            // This will run as a background activity and allow the rest of the method to continue.
+            // This is the simplest way to do this in this sample, but this is not good practice for real code because .net worker process will recycle and the background task may not complete.
+            _ = Task.Run(async () =>
             {
-                // This will run as a background activity and allow the rest of the method to continue.
-                // This is the simplest way to do this in this sample, but this is not good practice for real code because .net worker process will recycle and the background task may not complete.
-                _ = Task.Run(async () =>
-                {
-                    await Task.Delay(new TimeSpan(0, 0, instructions.CallbackAfterSeconds));
-                    using var httpClient = new HttpClient();
-                    _ = await httpClient.PostAsync(instructions.CallbackUri.AbsoluteUri, null);
-                });
-            }
-            
+                await Task.Delay(new TimeSpan(0, 0, instructions.CallbackAfterSeconds));
+                using var httpClient = new HttpClient();
+                _ = await httpClient.PostAsync(instructions.CallbackUri.AbsoluteUri, new StringContent(bool.TrueString));
+            });
+         
             // Return to caller
             if (instructions.ReturnError)
             {

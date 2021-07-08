@@ -17,7 +17,7 @@ namespace FunctionApp.Orchestrators
         /// <summary>
         /// Defines how long in milliseconds the API should wait before calling back.
         /// </summary>
-        private const int _callbackAfterSeconds = 30;
+        private const int _callbackAfterSeconds = 5;
 
         /// <summary>
         /// Api will return an error this % of the time. Use 0 if you never want an error, 100 if you always want an error.
@@ -27,7 +27,7 @@ namespace FunctionApp.Orchestrators
         /// <summary>
         /// How many seconds does the Api have to call back until the function times out
         /// </summary>
-        private const int _timeoutLimitSeconds = 5;
+        private const int _timeoutLimitSeconds = 30;
 
         /// <summary>
         /// How many times will the function attempt to call the api and receive an OK status code within the time span permitted.
@@ -73,10 +73,9 @@ namespace FunctionApp.Orchestrators
                 }
 
                 // Wait for the api to call back
-                var timeoutTimespan = new TimeSpan(0, 0, _timeoutLimitSeconds);
                 try
                 {
-                    await context.WaitForExternalEvent<bool>(Constants.CallbackEventName, timeoutTimespan, default);
+                    await context.WaitForExternalEvent<bool>(Constants.CallbackEventName, new TimeSpan(0, 0, _timeoutLimitSeconds));
                     hasTimedOut = false;
                 }
                 catch (TimeoutException)

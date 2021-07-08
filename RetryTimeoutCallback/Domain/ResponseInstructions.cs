@@ -1,4 +1,6 @@
-﻿namespace Domain
+﻿using System;
+
+namespace Domain
 {
     public class ResponseInstructions
     {
@@ -8,8 +10,13 @@
         public bool ReturnError { get; set; }
 
         /// <summary>
-        /// Defines how long in milliseconds the API should wait before responding.
+        /// Defines how long in seconds the API should wait before calling back.
         /// </summary>
-        public int RespondAfterMilliseconds { get; set; }
+        public int CallbackAfterSeconds { get; set; }
+
+        /// <summary>
+        /// The uri the Api should call back to. This should rehydrate the durable function using the WaitForExternalEvent method.
+        /// </summary>
+        public Uri CallbackUri { get; set; }
     }
 }

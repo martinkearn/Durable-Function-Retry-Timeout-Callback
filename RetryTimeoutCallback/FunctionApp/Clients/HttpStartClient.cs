@@ -1,8 +1,10 @@
-﻿using FunctionApp.Orchestrators;
+﻿using FunctionApp.Models;
+using FunctionApp.Orchestrators;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Extensions.Logging;
+using System;
 using System.Net.Http;
 using System.Threading.Tasks;
 
@@ -16,8 +18,12 @@ namespace FunctionApp.Clients
             [DurableClient] IDurableOrchestrationClient starter,
             ILogger log)
         {
-            // Function input comes from the request content.
-            string instanceId = await starter.StartNewAsync(nameof(MainOrchestrator), null);
+            // Create callback api and input payload
+            var managementPayload = starter.CreateHttpManagementPayload(Constants.TempInstanceId);
+            var mainOrchestrationInput = new MainOrchestrationInput() { SendEventPostUri = new Uri(managementPayload.SendEventPostUri) };
+
+            // Start orchestrator
+            string instanceId = await starter.StartNewAsync(nameof(MainOrchestrator), mainOrchestrationInput);
 
             log.LogInformation($"Started orchestration with ID = '{instanceId}'.");
 

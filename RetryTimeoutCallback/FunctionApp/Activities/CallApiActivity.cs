@@ -1,4 +1,5 @@
 ﻿using Domain;
+using FunctionApp.Models;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
 using System;
@@ -13,15 +14,19 @@ namespace FunctionApp.Activities
         [FunctionName(nameof(CallApiActivity))]
         public async static Task<HttpStatusCode> CallApi([ActivityTrigger] IDurableActivityContext context)
         {
+            // Get input
+            var input = context.GetInput<CallApiActivityInput>();
+
             // Generate random bool indicating whether the api should return sucess or not
             var random = new Random();
-            var randomBool = (random.Next(100) < 70); // Will be true 70% of the time
+            var randomBool = (random.Next(100) < input.ErrorResponseLikelihoodPercentage); 
 
             // Construct ResponseInstructions
             var instructions = new ResponseInstructions()
             {
-                RespondAfterMilliseconds = 0,
-                ReturnError = randomBool
+                CallbackAfterSeconds = input.CallbackAfterSeconds,
+                ReturnError = randomBool,
+                CallbackUri = input.CallbackUri,
             };
 
             // Make request to api

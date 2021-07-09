@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
@@ -39,9 +40,10 @@ namespace FunctionApp.Orchestrators
             var attemptCounterEntityId = new EntityId(nameof(AttemptCounterEntity), context.InstanceId);
 
             // Replace tokens in callback url with actual values
-            var callBackUrlBuilder = new StringBuilder(mainOrchestrationInput.SendEventPostUri.AbsoluteUri);
+            var callBackUrlBuilder = new StringBuilder(mainOrchestrationInput.SendEventPostUri.ToString());
             callBackUrlBuilder.Replace(Constants.SendEventPostUriEventNameToken, Constants.CallbackEventName);
             callBackUrlBuilder.Replace(Constants.TempInstanceId, context.InstanceId);
+            Debug.WriteLine($"Callback uri:{callBackUrlBuilder}");
 
             // Call Api until we get success or reach the retry limit
             AttemptCounterEntityState attemptCounterEntityState;
@@ -84,6 +86,9 @@ namespace FunctionApp.Orchestrators
 
                 // Get AttemptCounterEntityState
                 attemptCounterEntityState = await context.CallEntityAsync<AttemptCounterEntityState>(attemptCounterEntityId, "Get");
+
+                // Write to console
+                Debug.WriteLine($"Finished loop. Retry is {ExecuteRetry(attemptCounterEntityState.AttemptsCount, status, hasTimedOut)}. {attemptCounterEntityState.AttemptsCount} attempts, {attemptCounterEntityState.TimeoutsCount} timeouts, {attemptCounterEntityState.ErrorsCount} errors so far.");
             }
             while(ExecuteRetry(attemptCounterEntityState.AttemptsCount, status, hasTimedOut));
 

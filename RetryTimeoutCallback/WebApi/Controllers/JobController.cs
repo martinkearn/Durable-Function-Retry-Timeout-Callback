@@ -19,7 +19,7 @@ namespace WebApi.Controllers
         public ActionResult Post(ResponseInstructions instructions)
         {
             // Write callback uri to console
-            Debug.WriteLine($"Call back to:{instructions.CallbackUri}");
+            Debug.WriteLine($"Api has been called");
 
             // Delay for 5 seconds to simulate a real api.
             Thread.Sleep(3000);

@@ -24,7 +24,6 @@ namespace FunctionApp.Activities
             // Construct ResponseInstructions
             var instructions = new ResponseInstructions()
             {
-                CallbackAfterSeconds = input.CallbackAfterSeconds,
                 ReturnError = randomBool,
                 CallbackUri = input.CallbackUri,
             };

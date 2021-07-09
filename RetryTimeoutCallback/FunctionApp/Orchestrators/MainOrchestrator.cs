@@ -15,11 +15,6 @@ namespace FunctionApp.Orchestrators
         // Use these properties to control the behaviour of the function and api.
 
         /// <summary>
-        /// Defines how long in milliseconds the API should wait before calling back.
-        /// </summary>
-        private const int _callbackAfterSeconds = 5;
-
-        /// <summary>
         /// Api will return an error this % of the time. Use 0 if you never want an error, 100 if you always want an error.
         /// </summary>
         private const int _errorResponseLikelihoodPercentage = 0;
@@ -60,9 +55,8 @@ namespace FunctionApp.Orchestrators
                 // Trigger the Api with the CallApiActivityInput payload
                 var callApiActivityInput = new CallApiActivityInput()
                 {
-                    CallbackUri = new Uri(callBackUrlBuilder.ToString()),
-                    CallbackAfterSeconds = _callbackAfterSeconds,
                     ErrorResponseLikelihoodPercentage = _errorResponseLikelihoodPercentage,
+                    CallbackUri = new Uri(callBackUrlBuilder.ToString()), 
                 };
                 status = await context.CallActivityAsync<HttpStatusCode>(nameof(CallApiActivity), callApiActivityInput);
 
@@ -75,6 +69,9 @@ namespace FunctionApp.Orchestrators
                 // Wait for the api to call back
                 try
                 {
+                    // This line will make the function wait for the callback event.
+                    // This is a manual act that you can use postman or any api tool for.
+                    // Do a POST request to callBackUrlBuilder.ToString() with the word "true" in the body without any json structure.
                     await context.WaitForExternalEvent<bool>(Constants.CallbackEventName, new TimeSpan(0, 0, _timeoutLimitSeconds));
                     hasTimedOut = false;
                 }

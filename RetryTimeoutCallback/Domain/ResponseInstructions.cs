@@ -10,11 +10,6 @@ namespace Domain
         public bool ReturnError { get; set; }
 
         /// <summary>
-        /// Defines how long in seconds the API should wait before calling back.
-        /// </summary>
-        public int CallbackAfterSeconds { get; set; }
-
-        /// <summary>
         /// The uri the Api should call back to. This should rehydrate the durable function using the WaitForExternalEvent method.
         /// </summary>
         public Uri CallbackUri { get; set; }

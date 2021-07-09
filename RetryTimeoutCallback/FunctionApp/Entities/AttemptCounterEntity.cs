@@ -59,59 +59,5 @@ namespace FunctionApp.Entities
         public static Task Run([EntityTrigger] IDurableEntityContext ctx)
             => ctx.DispatchAsync<AttemptCounterEntity>();
 
-
-
-
-        //public AttemptCounterEntityState counter;
-
-        //public void IncrementAttempts()
-        //{
-        //    this.counter.AttemptsCount += 1;
-        //}
-
-        //public Task<AttemptCounterEntityState> Get()
-        //{
-        //    return Task.FromResult(this.counter);
-        //}
-
-        //[FunctionName(nameof(AttemptCounterEntity))]
-        //public static Task Run([EntityTrigger] IDurableEntityContext ctx)
-        //{
-        //    if (!ctx.HasState)
-        //    {
-        //        var defaultState = new AttemptCounterEntityState()
-        //        {
-        //            AttemptsCount = 0,
-        //            ErrorsCount = 0,
-        //            TimeoutsCount = 0
-        //        };
-        //        ctx.SetState(defaultState);
-        //    }
-
-        //    return ctx.DispatchAsync<AttemptCounterEntity>();
-        //}
-
-        //[FunctionName(nameof(AttemptCounterEntity))]
-        //public static void Counter([EntityTrigger] IDurableEntityContext ctx)
-        //{
-        //    switch (ctx.OperationName.ToLowerInvariant())
-        //    {
-        //        case "incrementattempts":
-        //            var defaultState = new AttemptCounterEntityState()
-        //            {
-        //                AttemptsCount = 0,
-        //                ErrorsCount = 0,
-        //                TimeoutsCount = 0
-        //            };
-        //            if (!ctx.HasState) ctx.SetState(defaultState);
-        //            ctx.SetState(ctx.GetState<AttemptCounterEntityState>().AttemptsCount += 1);
-        //            break;
-        //        case "get":
-        //            ctx.Return(ctx.GetState<AttemptCounterEntityState>());
-        //            break;
-        //    }
-        //}
-
-
     }
 }

@@ -23,7 +23,7 @@ namespace FunctionApp.Orchestrators
         /// <summary>
         /// How many seconds does the Api have to call back until the function times out
         /// </summary>
-        private const int _timeoutLimitSeconds = 30;
+        private const int _timeoutLimitSeconds = 60;
 
         /// <summary>
         /// How many times will the function attempt to call the api and receive an OK status code within the time span permitted.

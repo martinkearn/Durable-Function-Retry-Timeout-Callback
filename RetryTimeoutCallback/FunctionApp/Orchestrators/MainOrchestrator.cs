@@ -20,17 +20,17 @@ namespace FunctionApp.Orchestrators
         /// <summary>
         /// Api will return an error this % of the time. Use 0 if you never want an error, 100 if you always want an error.
         /// </summary>
-        private const int _errorResponseLikelihoodPercentage = 0;
+        private const int _errorResponseLikelihoodPercentage = 20;
 
         /// <summary>
         /// How many seconds does the Api have to call back until the function times out
         /// </summary>
-        private const int _timeoutLimitSeconds = 30;
+        private const int _timeoutLimitSeconds = 15;
 
         /// <summary>
         /// How many times will the function attempt to call the api and receive an OK status code within the time span permitted.
         /// </summary>
-        private const int _maxAttempts = 3;
+        private const int _maxAttempts = 10;
 
         [FunctionName(nameof(MainOrchestrator))]
         public static async Task<string> RunOrchestrator([OrchestrationTrigger] IDurableOrchestrationContext context)
@@ -78,22 +78,34 @@ namespace FunctionApp.Orchestrators
                 thisAttempt.StatusCode = StatusCode;
                 thisAttempt.StatusText = StatusText;
                 context.SignalEntity(attemptCounterEntityId, "UpdateAttempt", thisAttempt);
-                
-                // Wait for the api to call back
-                try
-                {
-                    thisAttempt.State = "waiting";
-                    context.SignalEntity(attemptCounterEntityId, "UpdateAttempt", thisAttempt);
 
-                    // This line will make the function wait for the callback event.
-                    // This is a manual act that you can use postman or any api tool for.
-                    // Do a POST request to the value of callBackUrlBuilder.ToString() (see debug console). Attach a json body with the word "true" in the body without any json structure.
-                    await context.WaitForExternalEvent<bool>(Constants.CallbackEventName, new TimeSpan(0, 0, _timeoutLimitSeconds));
-                }
-                catch (TimeoutException)
+                // Wait for the api to call back if the status was ok. If the status was not ok, don't bother waiting for callback
+                if (thisAttempt.StatusCode == HttpStatusCode.OK)
                 {
-                    // The api has failed to call back within the expected time span. Flag the timeout so the loop continues and increment the timeout counter
-                    thisAttempt.State = "timedout";
+                    try
+                    {
+                        thisAttempt.State = "waiting";
+                        context.SignalEntity(attemptCounterEntityId, "UpdateAttempt", thisAttempt);
+
+                        // This line will make the function wait for the callback event.
+                        // This is a manual act that you can use postman or any api tool for.
+                        // Do a POST request to the value of callBackUrlBuilder.ToString() (see debug console). Attach a json body with the word "true" in the body without any json structure.
+                        await context.WaitForExternalEvent<bool>(Constants.CallbackEventName, new TimeSpan(0, 0, _timeoutLimitSeconds));
+
+                        thisAttempt.State = "calledback";
+                        context.SignalEntity(attemptCounterEntityId, "UpdateAttempt", thisAttempt);
+                    }
+                    catch (TimeoutException)
+                    {
+                        // The api has failed to call back within the expected time span. Flag the timeout so the loop continues and increment the timeout counter
+                        thisAttempt.State = "timedout";
+                        context.SignalEntity(attemptCounterEntityId, "UpdateAttempt", thisAttempt);
+                    }
+                }
+                else
+                {
+                    // The api has failed
+                    thisAttempt.State = "failed";
                     context.SignalEntity(attemptCounterEntityId, "UpdateAttempt", thisAttempt);
                 }
 
@@ -108,7 +120,7 @@ namespace FunctionApp.Orchestrators
                 (mostRecentAttempt.State == "timedout")
             ));
 
-            return $"Finished after {attemptCounterEntityState.Attempts.Count} attempts.";
+            return $"Finished after {attemptCounterEntityState.Attempts.Count} attempts. Final status {mostRecentAttempt.State}, {mostRecentAttempt.StatusCode}, {mostRecentAttempt.StatusText}";
         }
 
         private static bool ExecuteRetry(int attempts, HttpStatusCode status, bool timedOut)

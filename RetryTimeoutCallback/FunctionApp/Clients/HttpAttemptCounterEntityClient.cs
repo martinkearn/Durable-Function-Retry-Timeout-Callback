@@ -4,7 +4,6 @@ using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Extensions.Logging;
-using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 
@@ -13,7 +12,7 @@ namespace FunctionApp.Clients
     public class HttpAttemptCounterEntityClient
     {
         /// <summary>
-        /// Returns the latest commited entity state for the given instanceid. Expect GET request /api/HttpAttemptCounterEntityClient?instanceid=[instanceidhere]
+        /// Returns the latest commited entity state for the given instanceid. Expects GET request /api/HttpAttemptCounterEntityClient?instanceid=[instanceidhere]
         /// </summary>
         /// <param name="req">HttpRequestMessage.</param>
         /// <param name="client">IDurableEntityClient.</param>

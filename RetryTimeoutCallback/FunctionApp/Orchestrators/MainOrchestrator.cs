@@ -8,6 +8,7 @@ using FunctionApp.Entities;
 using FunctionApp.Models;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
+using static FunctionApp.Models.AttemptCounterEntityState;
 
 namespace FunctionApp.Orchestrators
 {
@@ -23,7 +24,7 @@ namespace FunctionApp.Orchestrators
         /// <summary>
         /// How many seconds does the Api have to call back until the function times out
         /// </summary>
-        private const int _timeoutLimitSeconds = 60;
+        private const int _timeoutLimitSeconds = 15;
 
         /// <summary>
         /// How many times will the function attempt to call the api and receive an OK status code within the time span permitted.
@@ -52,7 +53,14 @@ namespace FunctionApp.Orchestrators
             do
             {
                 // Increment attempt counter
-                context.SignalEntity(attemptCounterEntityId, "IncrementAttempts");
+                var thisAttempt = new Attempt() 
+                {
+                    DateTimeStarted = context.CurrentUtcDateTime,
+                    Order = default, // Will get over-written by the entity based on number of existing Attempt
+                    State = "waiting",
+                    StatusText = string.Empty,
+                };
+                context.SignalEntity(attemptCounterEntityId, "AddAttempt", thisAttempt);
 
                 // Trigger the Api with the CallApiActivityInput payload
                 var callApiActivityInput = new CallApiActivityInput()
@@ -65,7 +73,7 @@ namespace FunctionApp.Orchestrators
                 // Increment error count if status is anything other than ok
                 if (status != HttpStatusCode.OK)
                 {
-                    context.SignalEntity(attemptCounterEntityId, "IncrementErrors");
+                    // TO DO update current attempt with error
                 }
 
                 // Wait for the api to call back
@@ -81,18 +89,18 @@ namespace FunctionApp.Orchestrators
                 {
                     // The api has failed to call back within the expected time span. Flag the timeout so the loop continues and increment the timeout counter
                     hasTimedOut = true;
-                    context.SignalEntity(attemptCounterEntityId, "IncrementTimeouts");
+                    // TO DO update current attempt with timeout
                 }
 
                 // Get AttemptCounterEntityState
                 attemptCounterEntityState = await context.CallEntityAsync<AttemptCounterEntityState>(attemptCounterEntityId, "Get");
 
                 // Write to console
-                Debug.WriteLine($"Finished loop. Retry is {ExecuteRetry(attemptCounterEntityState.AttemptsCount, status, hasTimedOut)}. {attemptCounterEntityState.AttemptsCount} attempts, {attemptCounterEntityState.TimeoutsCount} timeouts, {attemptCounterEntityState.ErrorsCount} errors so far.");
+                Debug.WriteLine($"Finished loop. Retry is {ExecuteRetry(attemptCounterEntityState.Attempts.Count, status, hasTimedOut)}. {attemptCounterEntityState.Attempts.Count} attempts.");
             }
-            while(ExecuteRetry(attemptCounterEntityState.AttemptsCount, status, hasTimedOut));
+            while(ExecuteRetry(attemptCounterEntityState.Attempts.Count, status, hasTimedOut));
 
-            return $"Finished with status of {status} after {attemptCounterEntityState.AttemptsCount} attempts, {attemptCounterEntityState.TimeoutsCount} timeouts, {attemptCounterEntityState.ErrorsCount} errors.";
+            return $"Finished with status of {status} after {attemptCounterEntityState.Attempts.Count} attempts.";
         }
 
         private static bool ExecuteRetry(int attempts, HttpStatusCode status, bool timedOut)

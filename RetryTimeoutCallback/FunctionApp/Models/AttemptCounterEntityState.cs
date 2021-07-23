@@ -1,17 +1,24 @@
 ﻿using Newtonsoft.Json;
+using System;
+using System.Collections.Generic;
+using System.Net;
 
 namespace FunctionApp.Models
 {
     [JsonObject(MemberSerialization = MemberSerialization.OptIn)]
     public class AttemptCounterEntityState
     {
-        [JsonProperty("attemptsCount")]
-        public int AttemptsCount { get; set; }
+        [JsonProperty("attempts")]
+        public List<Attempt> Attempts { get; set; } = new List<Attempt>();
 
-        [JsonProperty("timeoutsCount")]
-        public int TimeoutsCount { get; set; }
-
-        [JsonProperty("errorsCount")]
-        public int ErrorsCount { get; set; }
+        [JsonObject(MemberSerialization = MemberSerialization.OptOut)]
+        public struct Attempt
+        {
+            public Guid Id;
+            public DateTime DateTimeStarted;
+            public string State;
+            public string StatusText;
+            public HttpStatusCode? StatusCode;
+        }
     }
 }

@@ -12,7 +12,7 @@ namespace FunctionApp.Activities
     public static class CallApiActivity
     {
         [FunctionName(nameof(CallApiActivity))]
-        public async static Task<HttpStatusCode> CallApi([ActivityTrigger] IDurableActivityContext context)
+        public async static Task<(HttpStatusCode, string)> CallApi([ActivityTrigger] IDurableActivityContext context)
         {
             // Get input
             var input = context.GetInput<CallApiActivityInput>();
@@ -30,10 +30,13 @@ namespace FunctionApp.Activities
 
             // Make request to api
             using var httpClient = new HttpClient();
-            var response = await httpClient.PostAsJsonAsync("http://localhost:5000/api/Job", instructions);
-            
-            // Return status code
-            return response.StatusCode;
+            var responseMessage = await httpClient.PostAsJsonAsync("http://localhost:5000/api/Job", instructions);
+
+            // Prepare tuple to return
+            var response = (StatusCode: responseMessage.StatusCode, StatusText: responseMessage.ReasonPhrase);
+
+            // Return
+            return response;
         }
     }
 }

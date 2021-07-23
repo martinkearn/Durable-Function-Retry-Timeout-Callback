@@ -2,39 +2,39 @@
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
 using Newtonsoft.Json;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
+using static FunctionApp.Models.AttemptCounterEntityState;
 
 namespace FunctionApp.Entities
 {
     public class AttemptCounterEntity
     {
         [JsonProperty("attempts")]
-        public int Attempts { get; set; }
+        public List<Attempt> Attempts { get; set; }
 
-        [JsonProperty("errors")]
-        public int Errors { get; set; }
-
-        [JsonProperty("timeouts")]
-        public int Timeouts { get; set; }
-
-        public void IncrementAttempts()
+        public void AddAttempt(Attempt newAttempt)
         {
-            this.Attempts += 1;
+            if (this.Attempts == default)
+            {
+                this.Attempts = new List<Attempt>();
+            }
+            this.Attempts.Add(newAttempt);
         }
 
-        public void IncrementErrors()
+        public void UpdateAttempt(Attempt attempt)
         {
-            this.Errors += 1;
-        }
+            // Remove the existing attempt(s) with this ID
+            this.Attempts.RemoveAll(a => a.Id == attempt.Id);
 
-        public void IncrementTimeouts()
-        {
-            this.Timeouts += 1;
+            // Add new attempt
+            this.Attempts.Add(attempt);
         }
 
         public Task Reset()
         {
-            this.Attempts = 0;
+            this.Attempts.Clear();
             return Task.CompletedTask;
         }
 
@@ -42,9 +42,7 @@ namespace FunctionApp.Entities
         {
             var state = new AttemptCounterEntityState()
             {
-                AttemptsCount = Attempts,
-                ErrorsCount = Errors,
-                TimeoutsCount = Timeouts
+                Attempts = this.Attempts
             };
             return Task.FromResult(state);
         }
@@ -56,7 +54,9 @@ namespace FunctionApp.Entities
 
         [FunctionName(nameof(AttemptCounterEntity))]
         public static Task Run([EntityTrigger] IDurableEntityContext ctx)
-            => ctx.DispatchAsync<AttemptCounterEntity>();
+        {
+            return ctx.DispatchAsync<AttemptCounterEntity>();
+        }
 
     }
 }

@@ -82,12 +82,13 @@ namespace FunctionApp.Orchestrators
                 // Wait for the api to call back
                 try
                 {
+                    thisAttempt.State = "waiting";
+                    context.SignalEntity(attemptCounterEntityId, "UpdateAttempt", thisAttempt);
+
                     // This line will make the function wait for the callback event.
                     // This is a manual act that you can use postman or any api tool for.
                     // Do a POST request to the value of callBackUrlBuilder.ToString() (see debug console). Attach a json body with the word "true" in the body without any json structure.
                     await context.WaitForExternalEvent<bool>(Constants.CallbackEventName, new TimeSpan(0, 0, _timeoutLimitSeconds));
-                    thisAttempt.State = "waiting";
-                    context.SignalEntity(attemptCounterEntityId, "UpdateAttempt", thisAttempt);
                 }
                 catch (TimeoutException)
                 {

@@ -3,6 +3,7 @@ using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
 using Newtonsoft.Json;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using static FunctionApp.Models.AttemptCounterEntityState;
 
@@ -21,6 +22,15 @@ namespace FunctionApp.Entities
             }
             newAttempt.Order = this.Attempts.Count + 1;
             this.Attempts.Add(newAttempt);
+        }
+
+        public void UpdateAttempt(Attempt attempt)
+        {
+            // Remove the existing attempt(s) at this position
+            this.Attempts.RemoveAll(a => a.Order == attempt.Order);
+
+            // Add new attempt
+            this.Attempts.Add(attempt);
         }
 
         public Task Reset()

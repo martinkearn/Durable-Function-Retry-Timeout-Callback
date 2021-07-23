@@ -1,6 +1,7 @@
 ﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Net;
 
 namespace FunctionApp.Models
 {
@@ -17,6 +18,7 @@ namespace FunctionApp.Models
             public DateTime DateTimeStarted;
             public string State;
             public string StatusText;
+            public HttpStatusCode? StatusCode { get; set; }
         }
     }
 }

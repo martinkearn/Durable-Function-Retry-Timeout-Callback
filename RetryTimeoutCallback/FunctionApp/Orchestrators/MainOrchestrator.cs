@@ -1,6 +1,8 @@
 using System;
 using System.Diagnostics;
+using System.Linq;
 using System.Net;
+using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 using FunctionApp.Activities;
@@ -44,12 +46,13 @@ namespace FunctionApp.Orchestrators
             var callBackUrlBuilder = new StringBuilder(mainOrchestrationInput.SendEventPostUri.ToString());
             callBackUrlBuilder.Replace(Constants.SendEventPostUriEventNameToken, Constants.CallbackEventName);
             callBackUrlBuilder.Replace(Constants.TempInstanceId, context.InstanceId);
-            Debug.WriteLine($"Callback uri:{callBackUrlBuilder}");
+            if (!context.IsReplaying)
+            {
+                Debug.WriteLine($"Callback uri:{callBackUrlBuilder}");
+            }
 
             // Call Api until we get success or reach the retry limit
             AttemptCounterEntityState attemptCounterEntityState;
-            HttpStatusCode status;
-            var hasTimedOut = true;
             do
             {
                 // Increment attempt counter
@@ -57,8 +60,9 @@ namespace FunctionApp.Orchestrators
                 {
                     DateTimeStarted = context.CurrentUtcDateTime,
                     Order = default, // Will get over-written by the entity based on number of existing Attempt
-                    State = "waiting",
+                    State = "new",
                     StatusText = string.Empty,
+                    StatusCode = null,
                 };
                 context.SignalEntity(attemptCounterEntityId, "AddAttempt", thisAttempt);
 
@@ -68,14 +72,13 @@ namespace FunctionApp.Orchestrators
                     ErrorResponseLikelihoodPercentage = _errorResponseLikelihoodPercentage,
                     CallbackUri = new Uri(callBackUrlBuilder.ToString()), 
                 };
-                status = await context.CallActivityAsync<HttpStatusCode>(nameof(CallApiActivity), callApiActivityInput);
+                (HttpStatusCode StatusCode, string StatusText) = await context.CallActivityAsync<(HttpStatusCode, string)>(nameof(CallApiActivity), callApiActivityInput);
 
-                // Increment error count if status is anything other than ok
-                if (status != HttpStatusCode.OK)
-                {
-                    // TO DO update current attempt with error
-                }
-
+                // Store status code and text for the attempt
+                thisAttempt.StatusCode = StatusCode;
+                thisAttempt.StatusText = StatusText;
+                context.SignalEntity(attemptCounterEntityId, "UpdateAttempt", thisAttempt);
+                
                 // Wait for the api to call back
                 try
                 {
@@ -83,24 +86,27 @@ namespace FunctionApp.Orchestrators
                     // This is a manual act that you can use postman or any api tool for.
                     // Do a POST request to the value of callBackUrlBuilder.ToString() (see debug console). Attach a json body with the word "true" in the body without any json structure.
                     await context.WaitForExternalEvent<bool>(Constants.CallbackEventName, new TimeSpan(0, 0, _timeoutLimitSeconds));
-                    hasTimedOut = false;
+                    thisAttempt.State = "waiting";
+                    context.SignalEntity(attemptCounterEntityId, "UpdateAttempt", thisAttempt);
                 }
                 catch (TimeoutException)
                 {
                     // The api has failed to call back within the expected time span. Flag the timeout so the loop continues and increment the timeout counter
-                    hasTimedOut = true;
-                    // TO DO update current attempt with timeout
+                    thisAttempt.State = "timedout";
+                    context.SignalEntity(attemptCounterEntityId, "UpdateAttempt", thisAttempt);
                 }
 
                 // Get AttemptCounterEntityState
                 attemptCounterEntityState = await context.CallEntityAsync<AttemptCounterEntityState>(attemptCounterEntityId, "Get");
-
-                // Write to console
-                Debug.WriteLine($"Finished loop. Retry is {ExecuteRetry(attemptCounterEntityState.Attempts.Count, status, hasTimedOut)}. {attemptCounterEntityState.Attempts.Count} attempts.");
             }
-            while(ExecuteRetry(attemptCounterEntityState.Attempts.Count, status, hasTimedOut));
+            while(
+            ExecuteRetry(
+                attemptCounterEntityState.Attempts.Count, 
+                (HttpStatusCode)attemptCounterEntityState.Attempts.LastOrDefault().StatusCode, 
+                (attemptCounterEntityState.Attempts.LastOrDefault().State == "timedout")
+            ));
 
-            return $"Finished with status of {status} after {attemptCounterEntityState.Attempts.Count} attempts.";
+            return $"Finished after {attemptCounterEntityState.Attempts.Count} attempts.";
         }
 
         private static bool ExecuteRetry(int attempts, HttpStatusCode status, bool timedOut)

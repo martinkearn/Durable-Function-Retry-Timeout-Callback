@@ -2,7 +2,6 @@ using System;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
-using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 using FunctionApp.Activities;
@@ -26,7 +25,7 @@ namespace FunctionApp.Orchestrators
         /// <summary>
         /// How many seconds does the Api have to call back until the function times out
         /// </summary>
-        private const int _timeoutLimitSeconds = 15;
+        private const int _timeoutLimitSeconds = 30;
 
         /// <summary>
         /// How many times will the function attempt to call the api and receive an OK status code within the time span permitted.
@@ -53,6 +52,7 @@ namespace FunctionApp.Orchestrators
 
             // Call Api until we get success or reach the retry limit
             AttemptCounterEntityState attemptCounterEntityState;
+            Attempt mostRecentAttempt;
             do
             {
                 // Increment attempt counter
@@ -98,12 +98,13 @@ namespace FunctionApp.Orchestrators
 
                 // Get AttemptCounterEntityState
                 attemptCounterEntityState = await context.CallEntityAsync<AttemptCounterEntityState>(attemptCounterEntityId, "Get");
+                mostRecentAttempt = GetMostRecentAttempt(attemptCounterEntityState);
             }
             while(
             ExecuteRetry(
                 attemptCounterEntityState.Attempts.Count, 
-                (HttpStatusCode)attemptCounterEntityState.Attempts.LastOrDefault().StatusCode, 
-                (attemptCounterEntityState.Attempts.LastOrDefault().State == "timedout")
+                (HttpStatusCode)mostRecentAttempt.StatusCode, 
+                (mostRecentAttempt.State == "timedout")
             ));
 
             return $"Finished after {attemptCounterEntityState.Attempts.Count} attempts.";
@@ -124,5 +125,8 @@ namespace FunctionApp.Orchestrators
 
             return retry;
         }
+
+        private static Attempt GetMostRecentAttempt(AttemptCounterEntityState state) => state.Attempts.OrderByDescending(a => a.DateTimeStarted).ToList().FirstOrDefault();
+
     }
 }

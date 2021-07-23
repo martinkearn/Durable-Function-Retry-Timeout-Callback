@@ -58,8 +58,8 @@ namespace FunctionApp.Orchestrators
                 // Increment attempt counter
                 var thisAttempt = new Attempt() 
                 {
+                    Id = context.NewGuid(),
                     DateTimeStarted = context.CurrentUtcDateTime,
-                    Order = default, // Will get over-written by the entity based on number of existing Attempt
                     State = "new",
                     StatusText = string.Empty,
                     StatusCode = null,

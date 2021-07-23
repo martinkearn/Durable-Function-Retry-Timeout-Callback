@@ -14,11 +14,11 @@ namespace FunctionApp.Models
         [JsonObject(MemberSerialization = MemberSerialization.OptOut)]
         public struct Attempt
         {
-            public int Order;
+            public Guid Id;
             public DateTime DateTimeStarted;
             public string State;
             public string StatusText;
-            public HttpStatusCode? StatusCode { get; set; }
+            public HttpStatusCode? StatusCode;
         }
     }
 }

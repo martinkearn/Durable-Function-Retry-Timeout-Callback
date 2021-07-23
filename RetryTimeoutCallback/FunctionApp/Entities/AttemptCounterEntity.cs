@@ -20,14 +20,13 @@ namespace FunctionApp.Entities
             {
                 this.Attempts = new List<Attempt>();
             }
-            newAttempt.Order = this.Attempts.Count + 1;
             this.Attempts.Add(newAttempt);
         }
 
         public void UpdateAttempt(Attempt attempt)
         {
-            // Remove the existing attempt(s) at this position
-            this.Attempts.RemoveAll(a => a.Order == attempt.Order);
+            // Remove the existing attempt(s) with this ID
+            this.Attempts.RemoveAll(a => a.Id == attempt.Id);
 
             // Add new attempt
             this.Attempts.Add(attempt);

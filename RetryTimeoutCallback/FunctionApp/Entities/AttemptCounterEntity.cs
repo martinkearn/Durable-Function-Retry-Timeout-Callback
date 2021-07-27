@@ -2,6 +2,7 @@
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
 using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -14,12 +15,17 @@ namespace FunctionApp.Entities
         [JsonProperty("attempts")]
         public List<Attempt> Attempts { get; set; }
 
+        [JsonProperty("overallstate")]
+        public string OverallState { get; set; }
+
         public void AddAttempt(Attempt newAttempt)
         {
             if (this.Attempts == default)
             {
                 this.Attempts = new List<Attempt>();
             }
+
+            newAttempt.DateTimeStateSet = DateTime.UtcNow;
             this.Attempts.Add(newAttempt);
         }
 
@@ -29,7 +35,13 @@ namespace FunctionApp.Entities
             this.Attempts.RemoveAll(a => a.Id == attempt.Id);
 
             // Add new attempt
+            attempt.DateTimeStateSet = DateTime.UtcNow;
             this.Attempts.Add(attempt);
+        }
+
+        public void UpdateOverallState(string newState)
+        {
+            this.OverallState = newState;
         }
 
         public Task Reset()
@@ -42,7 +54,8 @@ namespace FunctionApp.Entities
         {
             var state = new AttemptCounterEntityState()
             {
-                Attempts = this.Attempts
+                Attempts = this.Attempts,
+                OverallState = this.OverallState,
             };
             return Task.FromResult(state);
         }

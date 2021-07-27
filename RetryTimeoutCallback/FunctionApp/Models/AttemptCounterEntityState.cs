@@ -11,11 +11,15 @@ namespace FunctionApp.Models
         [JsonProperty("attempts")]
         public List<Attempt> Attempts { get; set; } = new List<Attempt>();
 
+        [JsonProperty("overallstate")]
+        public string OverallState { get; set; } = "new";
+
         [JsonObject(MemberSerialization = MemberSerialization.OptOut)]
         public struct Attempt
         {
             public Guid Id;
             public DateTime DateTimeStarted;
+            public DateTime DateTimeStateSet;
             public string State;
             public string StatusText;
             public HttpStatusCode? StatusCode;

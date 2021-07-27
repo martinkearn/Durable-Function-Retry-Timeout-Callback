@@ -50,6 +50,8 @@ namespace FunctionApp.Orchestrators
                 Debug.WriteLine($"Callback uri:{callBackUrlBuilder}");
             }
 
+            context.SignalEntity(attemptCounterEntityId, "UpdateOverallState", "Calling api in loop.");
+
             // Call Api until we get success or reach the retry limit
             AttemptCounterEntityState attemptCounterEntityState;
             Attempt mostRecentAttempt;
@@ -90,9 +92,13 @@ namespace FunctionApp.Orchestrators
                         // This line will make the function wait for the callback event.
                         // This is a manual act that you can use postman or any api tool for.
                         // Do a POST request to the value of callBackUrlBuilder.ToString() (see debug console). Attach a json body with the word "true" in the body without any json structure.
-                        await context.WaitForExternalEvent<bool>(Constants.CallbackEventName, new TimeSpan(0, 0, _timeoutLimitSeconds));
+                        bool callBackSuccess;
+                        using (await context.LockAsync(attemptCounterEntityId))
+                        {
+                            callBackSuccess = await context.WaitForExternalEvent<bool>(Constants.CallbackEventName, new TimeSpan(0, 0, _timeoutLimitSeconds));
+                        }
 
-                        thisAttempt.State = "calledback";
+                        thisAttempt.State = (callBackSuccess) ? "calledbacksuccess" : "callbackfailure";
                         context.SignalEntity(attemptCounterEntityId, "UpdateAttempt", thisAttempt);
                     }
                     catch (TimeoutException)
@@ -120,7 +126,10 @@ namespace FunctionApp.Orchestrators
                 (mostRecentAttempt.State == "timedout")
             ));
 
-            return $"Finished after {attemptCounterEntityState.Attempts.Count} attempts. Final status {mostRecentAttempt.State}, {mostRecentAttempt.StatusCode}, {mostRecentAttempt.StatusText}";
+            var overallStateText = $"Finished after {attemptCounterEntityState.Attempts.Count} attempts. Final status {mostRecentAttempt.State}, {(HttpStatusCode)mostRecentAttempt.StatusCode}, {mostRecentAttempt.StatusText}";
+            context.SignalEntity(attemptCounterEntityId, "UpdateOverallState", overallStateText);
+
+            return overallStateText;
         }
 
         private static bool ExecuteRetry(int attempts, HttpStatusCode status, bool timedOut)

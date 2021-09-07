@@ -91,8 +91,8 @@ namespace FunctionApp.Orchestrators
                         entity.UpdateAttemptTimeoutDue(KeyValuePair.Create(thisAttemptId, context.CurrentUtcDateTime.Add(callbackTimeSpan)));
 
                         // This line will make the function wait for the callback event.
-                        // This is a manual act that you can use postman or any api tool for.
-                        // Do a POST request to the value of callBackUrlBuilder.ToString() (see debug console). Attach a json body with the word "true" in the body without any json structure.
+                        // This is a manual act that you can use postman or any http request tool for.
+                        // Do a POST request to the value of callBackUrlBuilder.ToString() (see debug console). Attach a json body with the word "true" or "falase" in the body without any json structure.
                         bool callBackSuccess;
                         using (await context.LockAsync(entityId))
                         {

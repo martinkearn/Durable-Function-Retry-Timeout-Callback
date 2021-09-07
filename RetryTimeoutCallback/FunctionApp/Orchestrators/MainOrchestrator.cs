@@ -96,7 +96,7 @@ namespace FunctionApp.Orchestrators
                         bool callBackSuccess;
                         using (await context.LockAsync(entityId))
                         {
-                            callBackSuccess = await context.WaitForExternalEvent<bool>(Constants.CallbackEventName, callbackTimeSpan, default);
+                            callBackSuccess = await context.WaitForExternalEvent<bool>(Constants.CallbackEventName, callbackTimeSpan);
                         }
 
                         var callbackOutcomeState = callBackSuccess ? AttemptState.CallbackSuccess : AttemptState.CallbackFailure;

@@ -57,7 +57,7 @@ namespace FunctionApp.Orchestrators
             // Keep attempting until we meet the criteria to stop attempting
             AttemptsEntityState attemptsEntityState;
             Attempt mostRecentAttempt;
-            entity.UpdateOverallState("Attempting job execution and call back.");
+            entity.UpdateOverallState("Attempting API request and call back.");
             do
             {
                 // Add new Attempt to entity
@@ -81,7 +81,7 @@ namespace FunctionApp.Orchestrators
 
                     // Store status
                     entity.UpdateAttemptState(KeyValuePair.Create(thisAttemptId, AttemptState.ExecutedSuccess));
-                    entity.UpdateAttemptMessage(KeyValuePair.Create(thisAttemptId, "Cleaned, prepared and executed job succesfully"));
+                    entity.UpdateAttemptMessage(KeyValuePair.Create(thisAttemptId, "Request sent to API succesfully"));
 
                     // Wait for API to call back
                     try

@@ -10,7 +10,7 @@ using static FunctionApp.Models.Enums;
 
 namespace FunctionApp.Entities
 {
-    public class AttemptsEntity
+    public class AttemptsEntity : IAttemptsEntity
     {
         [JsonProperty("attempts")]
         public Dictionary<Guid, Attempt> Attempts { get; set; }

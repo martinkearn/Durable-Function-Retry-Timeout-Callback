@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
@@ -6,10 +7,12 @@ using System.Text;
 using System.Threading.Tasks;
 using FunctionApp.Activities;
 using FunctionApp.Entities;
+using FunctionApp.Helpers;
 using FunctionApp.Models;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
 using static FunctionApp.Models.AttemptsEntityState;
+using static FunctionApp.Models.Enums;
 
 namespace FunctionApp.Orchestrators
 {
@@ -38,8 +41,9 @@ namespace FunctionApp.Orchestrators
             // Get input
             var mainOrchestrationInput = context.GetInput<MainOrchestrationInput>();
 
-            // Setup entity ID key'd from the orchestration instance id. One counter per orchestration instance.
-            var attemptCounterEntityId = new EntityId(nameof(AttemptsEntity), context.InstanceId);
+            // Initiate AttemptsEntity and proxy
+            var entityId = new EntityId(nameof(AttemptsEntity), context.InstanceId);
+            var entity = context.CreateEntityProxy<IAttemptsEntity>(entityId);
 
             // Replace tokens in callback url with actual values
             var callBackUrlBuilder = new StringBuilder(mainOrchestrationInput.SendEventPostUri.ToString());
@@ -50,105 +54,80 @@ namespace FunctionApp.Orchestrators
                 Debug.WriteLine($"Callback uri:{callBackUrlBuilder}");
             }
 
-            context.SignalEntity(attemptCounterEntityId, "UpdateOverallState", "Calling api in loop.");
-
-            // Call Api until we get success or reach the retry limit
-            AttemptsEntityState attemptCounterEntityState;
+            // Keep attempting until we meet the criteria to stop attempting
+            AttemptsEntityState attemptsEntityState;
             Attempt mostRecentAttempt;
+            entity.UpdateOverallState("Attempting job execution and call back.");
             do
             {
-                // Increment attempt counter
-                var thisAttempt = new Attempt() 
-                {
-                    Id = context.NewGuid(),
-                    DateTimeStarted = context.CurrentUtcDateTime,
-                    State = "new",
-                    StatusText = string.Empty,
-                    StatusCode = null,
-                };
-                context.SignalEntity(attemptCounterEntityId, "AddAttempt", thisAttempt);
+                // Add new Attempt to entity
+                var thisAttemptId = context.NewGuid();
+                entity.AddAttempt(thisAttemptId);
+                attemptsEntityState = await entity.Get();
 
-                // Trigger the Api with the CallApiActivityInput payload
-                var callApiActivityInput = new CallApiActivityInput()
+                // Attempt the API call and wait for callback.
+                try
                 {
-                    ErrorResponseLikelihoodPercentage = _errorResponseLikelihoodPercentage,
-                    CallbackUri = new Uri(callBackUrlBuilder.ToString()), 
-                };
-                (HttpStatusCode StatusCode, string StatusText) = await context.CallActivityAsync<(HttpStatusCode, string)>(nameof(CallApiActivity), callApiActivityInput);
+                    // Store status
+                    entity.UpdateAttemptState(KeyValuePair.Create(thisAttemptId, AttemptState.Executing));
 
-                // Store status code and text for the attempt
-                thisAttempt.StatusCode = StatusCode;
-                thisAttempt.StatusText = StatusText;
-                context.SignalEntity(attemptCounterEntityId, "UpdateAttempt", thisAttempt);
+                    // Trigger the Api with the CallApiActivityInput payload
+                    var callApiActivityInput = new CallApiActivityInput()
+                    {
+                        ErrorResponseLikelihoodPercentage = _errorResponseLikelihoodPercentage,
+                        CallbackUri = new Uri(callBackUrlBuilder.ToString()),
+                    };
+                    (HttpStatusCode StatusCode, string StatusText) = await context.CallActivityAsync<(HttpStatusCode, string)>(nameof(CallApiActivity), callApiActivityInput);
 
-                // Wait for the api to call back if the status was ok. If the status was not ok, don't bother waiting for callback
-                if (thisAttempt.StatusCode == HttpStatusCode.OK)
-                {
+                    // Store status
+                    entity.UpdateAttemptState(KeyValuePair.Create(thisAttemptId, AttemptState.ExecutedSuccess));
+                    entity.UpdateAttemptMessage(KeyValuePair.Create(thisAttemptId, "Cleaned, prepared and executed job succesfully"));
+
+                    // Wait for API to call back
                     try
                     {
-                        thisAttempt.State = "waiting";
-                        context.SignalEntity(attemptCounterEntityId, "UpdateAttempt", thisAttempt);
+                        var callbackTimeSpan = new TimeSpan(0, 0, _timeoutLimitSeconds);
+                        entity.UpdateAttemptState(KeyValuePair.Create(thisAttemptId, AttemptState.WaitingForCallback));
+                        entity.UpdateAttemptTimeoutDue(KeyValuePair.Create(thisAttemptId, context.CurrentUtcDateTime.Add(callbackTimeSpan)));
 
                         // This line will make the function wait for the callback event.
                         // This is a manual act that you can use postman or any api tool for.
                         // Do a POST request to the value of callBackUrlBuilder.ToString() (see debug console). Attach a json body with the word "true" in the body without any json structure.
                         bool callBackSuccess;
-                        using (await context.LockAsync(attemptCounterEntityId))
+                        using (await context.LockAsync(entityId))
                         {
-                            callBackSuccess = await context.WaitForExternalEvent<bool>(Constants.CallbackEventName, new TimeSpan(0, 0, _timeoutLimitSeconds));
+                            callBackSuccess = await context.WaitForExternalEvent<bool>(Constants.CallbackEventName, callbackTimeSpan, default);
                         }
 
-                        thisAttempt.State = (callBackSuccess) ? "calledbacksuccess" : "callbackfailure";
-                        context.SignalEntity(attemptCounterEntityId, "UpdateAttempt", thisAttempt);
+                        var callbackOutcomeState = callBackSuccess ? AttemptState.CallbackSuccess : AttemptState.CallbackFailure;
+                        entity.UpdateAttemptState(KeyValuePair.Create(thisAttemptId, callbackOutcomeState));
+                        entity.UpdateAttemptMessage(KeyValuePair.Create(thisAttemptId, $"API called back with {callbackOutcomeState}"));
                     }
-                    catch (TimeoutException)
+                    catch (TimeoutException tex)
                     {
-                        // The api has failed to call back within the expected time span. Flag the timeout so the loop continues and increment the timeout counter
-                        thisAttempt.State = "timedout";
-                        context.SignalEntity(attemptCounterEntityId, "UpdateAttempt", thisAttempt);
+                        // The API has failed to call back within the expected time span. Flag the timeout so the loop continues and increment the timeout counter
+                        entity.UpdateAttemptState(KeyValuePair.Create(thisAttemptId, AttemptState.TimedOut));
+                        entity.UpdateAttemptMessage(KeyValuePair.Create(thisAttemptId, tex.Message));
                     }
                 }
-                else
+                catch (FunctionFailedException fex)
                 {
-                    // The api has failed
-                    thisAttempt.State = "failed";
-                    context.SignalEntity(attemptCounterEntityId, "UpdateAttempt", thisAttempt);
+                    // The attempt to call the API has failed (API returned an error code). Store status
+                    entity.UpdateAttemptState(KeyValuePair.Create(thisAttemptId, AttemptState.ExecutedFailed));
+                    entity.UpdateAttemptMessage(KeyValuePair.Create(thisAttemptId, fex.Message));
                 }
 
-                // Get AttemptCounterEntityState
-                attemptCounterEntityState = await context.CallEntityAsync<AttemptsEntityState>(attemptCounterEntityId, "Get");
-                mostRecentAttempt = GetMostRecentAttempt(attemptCounterEntityState);
+                // Get AttemptsEntityState
+                attemptsEntityState = await entity.Get();
+                mostRecentAttempt = attemptsEntityState.Attempts.OrderByDescending(a => a.Value.Started).First().Value;
             }
-            while(
-            ExecuteRetry(
-                attemptCounterEntityState.Attempts.Count, 
-                (HttpStatusCode)mostRecentAttempt.StatusCode, 
-                (mostRecentAttempt.State == "timedout")
-            ));
+            while (RetryHelper.RequireRetry(attemptsEntityState.Attempts.Count, mostRecentAttempt.IsSuccess, _maxAttempts));
 
-            var overallStateText = $"Finished after {attemptCounterEntityState.Attempts.Count} attempts. Final status {mostRecentAttempt.State}, {(HttpStatusCode)mostRecentAttempt.StatusCode}, {mostRecentAttempt.StatusText}";
-            context.SignalEntity(attemptCounterEntityId, "UpdateOverallState", overallStateText);
+            // Write function output
+            var completionMessage = $"Completed API request after {attemptsEntityState.Attempts.Count} attempts. Final state {mostRecentAttempt.State}, status text: {mostRecentAttempt.Message}";
+            entity.UpdateOverallState(completionMessage);
 
-            return overallStateText;
+            return completionMessage;
         }
-
-        private static bool ExecuteRetry(int attempts, HttpStatusCode status, bool timedOut)
-        {
-            var retry = false;
-
-            // Retry if we do not have an OK response
-            if (status != HttpStatusCode.OK) retry = true;
-
-            // Retry if we timed out
-            if (timedOut) retry = true;
-
-            // Overrule other conditions if we are equal to max attempts count
-            if (attempts == _maxAttempts) retry = false;
-
-            return retry;
-        }
-
-        private static Attempt GetMostRecentAttempt(AttemptsEntityState state) => state.Attempts.OrderByDescending(a => a.DateTimeStarted).ToList().FirstOrDefault();
-
     }
 }

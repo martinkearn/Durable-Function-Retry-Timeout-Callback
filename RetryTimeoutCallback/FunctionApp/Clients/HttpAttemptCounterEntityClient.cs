@@ -19,7 +19,7 @@ namespace FunctionApp.Clients
         /// <param name="log">ILogger.</param>
         /// <returns>The latest commmited AttemptCounterEntityState for the given orchestration instance id.</returns>
         [FunctionName(nameof(HttpAttemptCounterEntityClient))]
-        public static async Task<AttemptCounterEntityState> HttpAttemptCounterEntity(
+        public static async Task<AttemptsEntityState> HttpAttemptCounterEntity(
             [HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestMessage req,
             [DurableClient] IDurableEntityClient client,
             ILogger log)
@@ -29,10 +29,10 @@ namespace FunctionApp.Clients
             var instanceId = queryString["instanceid"];
 
             // Setup entity ID key'd from the orchestration instance id. One counter per orchestration instance.
-            var attemptCounterEntityId = new EntityId(nameof(AttemptCounterEntity), instanceId);
+            var attemptCounterEntityId = new EntityId(nameof(AttemptsEntity), instanceId);
 
             // get entity state
-            var stateResponse = await client.ReadEntityStateAsync<AttemptCounterEntityState>(attemptCounterEntityId);
+            var stateResponse = await client.ReadEntityStateAsync<AttemptsEntityState>(attemptCounterEntityId);
 
             // Return
             return stateResponse.EntityState;

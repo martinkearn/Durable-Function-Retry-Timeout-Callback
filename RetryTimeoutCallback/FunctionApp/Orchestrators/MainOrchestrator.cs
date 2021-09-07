@@ -9,7 +9,7 @@ using FunctionApp.Entities;
 using FunctionApp.Models;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.DurableTask;
-using static FunctionApp.Models.AttemptCounterEntityState;
+using static FunctionApp.Models.AttemptsEntityState;
 
 namespace FunctionApp.Orchestrators
 {
@@ -39,7 +39,7 @@ namespace FunctionApp.Orchestrators
             var mainOrchestrationInput = context.GetInput<MainOrchestrationInput>();
 
             // Setup entity ID key'd from the orchestration instance id. One counter per orchestration instance.
-            var attemptCounterEntityId = new EntityId(nameof(AttemptCounterEntity), context.InstanceId);
+            var attemptCounterEntityId = new EntityId(nameof(AttemptsEntity), context.InstanceId);
 
             // Replace tokens in callback url with actual values
             var callBackUrlBuilder = new StringBuilder(mainOrchestrationInput.SendEventPostUri.ToString());
@@ -53,7 +53,7 @@ namespace FunctionApp.Orchestrators
             context.SignalEntity(attemptCounterEntityId, "UpdateOverallState", "Calling api in loop.");
 
             // Call Api until we get success or reach the retry limit
-            AttemptCounterEntityState attemptCounterEntityState;
+            AttemptsEntityState attemptCounterEntityState;
             Attempt mostRecentAttempt;
             do
             {
@@ -116,7 +116,7 @@ namespace FunctionApp.Orchestrators
                 }
 
                 // Get AttemptCounterEntityState
-                attemptCounterEntityState = await context.CallEntityAsync<AttemptCounterEntityState>(attemptCounterEntityId, "Get");
+                attemptCounterEntityState = await context.CallEntityAsync<AttemptsEntityState>(attemptCounterEntityId, "Get");
                 mostRecentAttempt = GetMostRecentAttempt(attemptCounterEntityState);
             }
             while(
@@ -148,7 +148,7 @@ namespace FunctionApp.Orchestrators
             return retry;
         }
 
-        private static Attempt GetMostRecentAttempt(AttemptCounterEntityState state) => state.Attempts.OrderByDescending(a => a.DateTimeStarted).ToList().FirstOrDefault();
+        private static Attempt GetMostRecentAttempt(AttemptsEntityState state) => state.Attempts.OrderByDescending(a => a.DateTimeStarted).ToList().FirstOrDefault();
 
     }
 }

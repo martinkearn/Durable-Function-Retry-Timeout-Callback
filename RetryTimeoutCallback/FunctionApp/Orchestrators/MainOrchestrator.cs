@@ -57,7 +57,7 @@ namespace FunctionApp.Orchestrators
             // Keep attempting until we meet the criteria to stop attempting
             AttemptsEntityState attemptsEntityState;
             Attempt mostRecentAttempt;
-            entity.UpdateOverallState("Attempting API request and call back.");
+            entity.UpdateOverallState("Attempting API request and waiting for external system call back.");
             do
             {
                 // Add new Attempt to entity
@@ -101,7 +101,7 @@ namespace FunctionApp.Orchestrators
 
                         var callbackOutcomeState = callBackSuccess ? AttemptState.CallbackSuccess : AttemptState.CallbackFailure;
                         entity.UpdateAttemptState(KeyValuePair.Create(thisAttemptId, callbackOutcomeState));
-                        entity.UpdateAttemptMessage(KeyValuePair.Create(thisAttemptId, $"API called back with {callbackOutcomeState}"));
+                        entity.UpdateAttemptMessage(KeyValuePair.Create(thisAttemptId, $"External system called back with {callbackOutcomeState}"));
                     }
                     catch (TimeoutException tex)
                     {
